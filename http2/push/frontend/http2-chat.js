@@ -34,43 +34,54 @@ async function postNewMsg(user, text) {
 async function getNewMsgs() {
   let reader;
   const utf8Decoder = new TextDecoder("utf-8");
+
   try {
     const res = await fetch("/msgs");
-    reader = res.body.getReader();
-  } catch (e) {
-    console.log("connection error", e);
+    reader = res.body.getReader(); //We are not using json, because the data will come as stream (continuos beaming), and not as json
+  } catch (error) {
+    console.log("connection error", error);
   }
+
+  presence.innerText = '🟢 Connected...'
+
   let done;
-  presence.innerText = "🟢";
+
   do {
+
     let readerResponse;
     try {
-      readerResponse = await reader.read();
-    } catch (e) {
-      console.error("reader failed", e);
+      readerResponse = await reader.read(); //read one byte or something
+    } catch (error) {
+      console.error("reader fail", error);
       presence.innerText = "🔴";
       return;
     }
+    const chunk = utf8Decoder.decode(readerResponse.value, {
+      stream: true
+    });
     done = readerResponse.done;
-    const chunk = utf8Decoder.decode(readerResponse.value, { stream: true });
     if (chunk) {
       try {
         const json = JSON.parse(chunk);
         allChat = json.msg;
-        render();
       } catch (e) {
         console.error("parse error", e);
       }
     }
-    console.log("done", done);
+
   } while (!done);
-  // in theory, if our http2 connection closed, `done` would come back
-  // as true and we'd no longer be connected
+
   presence.innerText = "🔴";
+
 }
 
 function render() {
-  const html = allChat.map(({ user, text, time, id }) =>
+  const html = allChat.map(({
+      user,
+      text,
+      time,
+      id
+    }) =>
     template(user, text, time, id)
   );
   msgs.innerHTML = html.join("\n");
